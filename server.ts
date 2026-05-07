@@ -25,20 +25,23 @@ async function startServer() {
         return res.status(500).json({ error: "GEMINI_API_KEY not configured on server" });
       }
 
-      const genAI = new (GoogleGenAI as any)(apiKey);
-      const aiModel = genAI.getGenerativeModel({ model });
+      const ai = new GoogleGenAI({ apiKey });
 
       if (type === "chat") {
-        const chat = aiModel.startChat({
-          history: conversation.slice(0, -1), // everything except the new message
-          systemInstruction: systemInstruction,
+        const response = await ai.models.generateContent({
+          model: model as string,
+          contents: conversation,
+          config: {
+            systemInstruction: systemInstruction
+          }
         });
-        const lastMsg = conversation[conversation.length - 1];
-        const result = await chat.sendMessage(lastMsg.parts[0].text);
-        return res.json({ text: result.response.text() });
+        return res.json({ text: response.text });
       } else {
-        const result = await aiModel.generateContent(prompt);
-        return res.json({ text: result.response.text() });
+        const response = await ai.models.generateContent({
+          model: model as string,
+          contents: prompt
+        });
+        return res.json({ text: response.text });
       }
     } catch (error: any) {
       console.error("AI Proxy Error:", error);

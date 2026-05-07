@@ -3,20 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { GoogleGenAI } from "@google/genai";
 import { UserProfile, Topic, StudySession, StudyMaterial, QuizQuestion } from "../types";
 
-async function callAIProxy(payload: any) {
-  const response = await fetch("/api/ai/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || "AI Proxy Error");
-  }
-  return await response.json();
-}
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
 
 export const AgentPersonas = {
   CURRICULUM_ANALYST: `You are the Curriculum Analyst Agent. Your task is to break down a complex subject into 12-18 highly specific structured topics. 
@@ -73,7 +63,10 @@ export async function generateCurriculum(subject: string, profile: UserProfile):
   Generate a list of 5-8 structured topics.`;
 
   try {
-    const response = await callAIProxy({ prompt });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
     const text = response.text || "";
     const jsonStr = text.match(/\[[\s\S]*\]/)?.[0] || text;
     return JSON.parse(jsonStr);
@@ -94,7 +87,10 @@ export async function generateStudyPlan(subject: string, topics: Topic[], deadli
   Generate a list of StudySessions starting from tomorrow until the deadline. Use YYYY-MM-DD format.`;
 
   try {
-    const response = await callAIProxy({ prompt });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
     const text = response.text || "";
     const jsonStr = text.match(/\[[\s\S]*\]/)?.[0] || text;
     return JSON.parse(jsonStr);
@@ -113,7 +109,10 @@ export async function generateMaterials(topic: Topic): Promise<StudyMaterial> {
   Topic Details: ${topic.description}`;
 
   try {
-    const response = await callAIProxy({ prompt });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
     const text = response.text || "";
     const jsonStr = text.match(/\{[\s\S]*\}/)?.[0] || text;
     const parsed = JSON.parse(jsonStr);
@@ -132,7 +131,10 @@ export async function generateAssessment(topic: Topic): Promise<QuizQuestion[]> 
   Generate 5 multiple-choice questions. Return as a JSON array.`;
 
   try {
-    const response = await callAIProxy({ prompt });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
     const text = response.text || "";
     const jsonStr = text.match(/\[[\s\S]*\]/)?.[0] || text;
     return JSON.parse(jsonStr);
@@ -143,15 +145,17 @@ export async function generateAssessment(topic: Topic): Promise<QuizQuestion[]> 
 }
 
 export async function getTutorResponse(conversation: any[], topic: string) {
-  // The conversation history already contains the latest user message from the UI
   const systemPrompt = AgentPersonas.SOCRATIC_TUTOR + ` You are currently teaching the topic: ${topic}.`;
 
   try {
-    const response = await callAIProxy({
-      type: "chat",
-      conversation,
-      systemInstruction: systemPrompt
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: conversation,
+      config: {
+        systemInstruction: systemPrompt
+      }
     });
+    
     return response.text || "I'm having trouble connecting to the knowledge stream. Let's try again in a moment.";
   } catch (error) {
     console.error("Error in tutor chat:", error);
@@ -172,7 +176,10 @@ export async function enrichTopic(title: string, subject: string): Promise<Topic
   Include: title, description, difficulty, estimatedTimeHours, prerequisites (list of keywords), and subtopics (list of objects with id, title, status='pending', completionPercentage=0).`;
 
   try {
-    const response = await callAIProxy({ prompt });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
     const text = response.text || "";
     const jsonStr = text.match(/\{[\s\S]*\}/)?.[0] || text;
     const topic = JSON.parse(jsonStr);
@@ -196,11 +203,14 @@ export async function suggestNextTopic(subject: string, existingTopics: Topic[])
   The topic should logically FOLLOW the existing nodes.
   
   VALIDATION: If the subject "${subject}" is nonsensical, you MUST return a JSON object with: { "title": "INVALID_INPUT", "description": "Subject context lost.", "difficulty": "Beginner", "subtopics": [] }.
-
+ 
   Return a single JSON object matching the Topic interface.`;
 
   try {
-    const response = await callAIProxy({ prompt });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
     const text = response.text || "";
     const jsonStr = text.match(/\{[\s\S]*\}/)?.[0] || text;
     const topic = JSON.parse(jsonStr);
@@ -222,7 +232,10 @@ export async function generateExamStrategy(subject: string, topics: Topic[]): Pr
   Analyze the curriculum and provide a strategic mastery guide.`;
 
   try {
-    const response = await callAIProxy({ prompt });
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
     const text = response.text || "";
     const jsonStr = text.match(/\{[\s\S]*\}/)?.[0] || text;
     return JSON.parse(jsonStr);

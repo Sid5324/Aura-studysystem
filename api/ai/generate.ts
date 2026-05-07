@@ -13,20 +13,23 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: "GEMINI_API_KEY not configured on server" });
     }
 
-    const genAI = new (GoogleGenAI as any)(apiKey);
-    const aiModel = genAI.getGenerativeModel({ model });
+    const ai = new GoogleGenAI({ apiKey });
 
     if (type === "chat") {
-      const chat = aiModel.startChat({
-        history: (conversation || []).slice(0, -1),
-        systemInstruction: systemInstruction,
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: conversation,
+        config: {
+          systemInstruction: systemInstruction,
+        }
       });
-      const lastMsg = conversation[conversation.length - 1];
-      const result = await chat.sendMessage(lastMsg.parts[0].text);
-      return res.status(200).json({ text: result.response.text() });
+      return res.status(200).json({ text: response.text });
     } else {
-      const result = await aiModel.generateContent(prompt);
-      return res.status(200).json({ text: result.response.text() });
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt
+      });
+      return res.status(200).json({ text: response.text });
     }
   } catch (error: any) {
     console.error("AI Proxy Error:", error);
