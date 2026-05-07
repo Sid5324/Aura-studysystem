@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user preferences and learning style data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "profile": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email"]
+    },
+    "Topic": {
+      "title": "Study Topic",
+      "description": "A node in the Knowledge Graph representing a curriculum item.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "subject": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "status": { "type": "string" },
+        "prerequisites": { "type": "array" },
+        "ownerId": { "type": "string" }
+      }
+    },
+    "ScheduledSession": {
+      "title": "Scheduled Session",
+      "description": "A time-blocked study unit in the planner.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "topicId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "type": { "type": "string" },
+        "status": { "type": "string" },
+        "ownerId": { "type": "string" }
+      }
+    },
+    "ChatThread": {
+      "title": "Chat Thread",
+      "description": "A conversation thread in the Study Hall.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "mode": { "type": "string", "enum": ["focused", "free"] },
+        "topicId": { "type": "string" },
+        "scheduledSessionId": { "type": "string" },
+        "title": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      }
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "An individual message within a chat thread.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "model", "system"] },
+        "parts": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      }
+    },
+    "TopicMemory": {
+      "title": "Topic Memory",
+      "description": "A lightweight summary of recent learning for a specific topic.",
+      "type": "object",
+      "properties": {
+        "topicId": { "type": "string" },
+        "lastUpdatedAt": { "type": "string", "format": "date-time" },
+        "summary": { "type": "string" },
+        "ownerId": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Top-level user document."
+    },
+    "/users/{userId}/topics/{topicId}": {
+      "schema": "Topic",
+      "description": "User's individual study topics."
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "ScheduledSession",
+      "description": "User's scheduled study sessions."
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": "ChatThread",
+      "description": "User's chat threads."
+    },
+    "/users/{userId}/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Messages within a chat thread."
+    },
+    "/users/{userId}/topicMemories/{topicId}": {
+      "schema": "TopicMemory",
+      "description": "Summarized memories for a topic."
+    }
+  }
+}

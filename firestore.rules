@@ -1,0 +1,142 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validators
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['id', 'email']) &&
+             data.id == request.auth.uid &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidTopic(data) {
+      return data.keys().hasAll(['id', 'title', 'ownerId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.title is string && data.title.size() <= 200 &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['id', 'topicId', 'ownerId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.topicId is string && data.topicId.size() <= 128 &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidChatThread(data) {
+      return data.keys().hasAll(['id', 'ownerId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['id', 'chatId', 'ownerId', 'role', 'parts', 'createdAt']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.chatId is string && data.chatId.size() <= 128 &&
+             data.ownerId == request.auth.uid &&
+             data.role in ['user', 'model', 'system'] &&
+             data.parts is list && data.parts.size() > 0 &&
+             data.parts[0].text is string && data.parts[0].text.size() <= 20000;
+    }
+
+    function isValidTopicMemory(data) {
+      return data.keys().hasAll(['topicId', 'ownerId', 'summary']) &&
+             data.topicId is string && data.topicId.size() <= 128 &&
+             data.ownerId == request.auth.uid &&
+             data.summary is string && data.summary.size() <= 20000;
+    }
+
+    // Match Rules
+    match /test/connection {
+      allow read: if isSignedIn();
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if isOwner(userId) && 
+                      incoming().id == existing().id && 
+                      incoming().email == existing().email && 
+                      isValidUserProfile(incoming()) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'profile', 'createdAt']);
+      
+      // Sub-collections
+      match /topics/{topicId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(topicId) && isValidTopic(incoming());
+        allow update: if isOwner(userId) && 
+                        incoming().id == existing().id && 
+                        incoming().ownerId == existing().ownerId &&
+                        isValidTopic(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      match /sessions/{sessionId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(sessionId) && isValidSession(incoming());
+        allow update: if isOwner(userId) && 
+                        incoming().id == existing().id && 
+                        incoming().ownerId == existing().ownerId &&
+                        isValidSession(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      match /chats/{chatId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(chatId) && isValidChatThread(incoming());
+        allow update: if isOwner(userId) && 
+                        incoming().id == existing().id && 
+                        incoming().ownerId == existing().ownerId &&
+                        isValidChatThread(incoming()) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt', 'title', 'mode', 'topicId', 'scheduledSessionId']);
+        allow delete: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidId(messageId) && isValidChatMessage(incoming());
+          allow update: if false; // Messages are immutable
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /topicMemories/{topicId} {
+        allow get: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidId(topicId) && isValidTopicMemory(incoming());
+      }
+      
+      // Legacy Projects Path (from studyService.ts)
+      match /projects/{projectId} {
+         allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}
